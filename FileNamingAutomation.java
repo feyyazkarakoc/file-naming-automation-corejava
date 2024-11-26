@@ -157,3 +157,165 @@ public class FileNamingAutomation {
         return (dotIndex != -1) ? fileName.substring(dotIndex) : "";
     }
 }
+
+
+
+
+/*import java.io.File;
+import java.io.IOException;
+import java.util.concurrent.*;
+import java.util.logging.FileHandler;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+
+public class FileRenamer {
+
+    private static final String TARGET_FOLDER = "C:\\Users\\Lenovo\\Desktop\\task"; // Replace with your target folder path
+    private static final Logger logger = Logger.getLogger(FileRenamer.class.getName());
+
+    static {
+        try {
+            FileHandler fileHandler = new FileHandler("renamer.log", true);
+            logger.addHandler(fileHandler);
+            SimpleFormatter formatter = new SimpleFormatter();
+            fileHandler.setFormatter(formatter);
+        } catch (IOException e) {
+            logger.severe("Error initializing logger: " + e.getMessage());
+        }
+    }
+
+    public static void main(String[] args) {
+        ExecutorService executor = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
+        try {
+            renameFiles(new File(TARGET_FOLDER), executor);
+        } finally {
+            executor.shutdown(); // Ensure shutdown is always called
+            try {
+                // Added awaitTermination that ensures all tasks are completed before shutting down
+                if (!executor.awaitTermination(60, TimeUnit.SECONDS)) {
+                    logger.severe("Executor did not terminate in the specified time.");
+                }
+            } catch (InterruptedException e) {
+                logger.severe("Interrupted while waiting for termination: " + e.getMessage());
+            }
+        }
+    }
+
+    private static void renameFiles(File folder, ExecutorService executor) {
+        File[] files = folder.listFiles();
+
+        if (files == null) {
+            logger.warning("Folder is inaccessible: " + folder.getAbsolutePath());
+            return;
+        }
+
+        // Check if the folder is empty
+        if (files.length == 0) {
+            logger.warning("Folder is empty: " + folder.getAbsolutePath());
+            return;
+        }
+
+        // Added ConcurrentHashMap to ensure thread-safe. Thread-safe map to store counters for file types.
+        ConcurrentHashMap<String, Integer> counters = new ConcurrentHashMap<>();
+
+        // Process subfolders concurrently
+        for (File file : files) {
+            if (file.isDirectory()) {
+                // Added a warning log if the folder is empty or inaccessible. Log if a subfolder is empty
+                if (isEmptyDirectory(file)) {
+                    logger.warning("Subfolder is empty: " + file.getAbsolutePath());
+                } else {
+                    executor.submit(() -> renameFiles(file, executor));
+                }
+            }
+        }
+
+        // Process files in the current folder
+        for (File file : files) {
+            if (file.isFile() && !file.getName().startsWith("Renamed_")) {
+                renameFile(file, counters);
+            }
+        }
+
+        logger.info("Processed folder: " + folder.getAbsolutePath());
+    }
+
+
+    // Added a warning log if the folder is empty or inaccessible.
+    private static boolean isEmptyDirectory(File folder) {
+        File[] files = folder.listFiles();
+        return files == null || files.length == 0;
+    }
+
+    private static void renameFile(File file, ConcurrentHashMap<String, Integer> counters) {
+        String originalName = file.getName();
+        int extensionIndex = originalName.lastIndexOf('.');
+        if (extensionIndex == -1) {
+            logger.severe("Error renaming file: " + originalName + ". No extension found.");
+            return;
+        }
+
+        String extension = originalName.substring(extensionIndex);
+        String originalNameWithoutExtension = originalName.substring(0, extensionIndex);
+        String fileType = getFileType(extension);
+
+        // Find the correct sequence number considering existing files
+        int counter = counters.compute(fileType, (key, value) -> {
+            if (value == null) value = getCurrentMaxSequence(file.getParentFile(), fileType);
+            return value + 1;
+        });
+
+        String newName = "Renamed_" + fileType + counter + "_" + originalNameWithoutExtension + extension;
+        File newFile = new File(file.getParent(), newName);
+
+        try {
+            if (file.renameTo(newFile)) {
+                logger.info("Renamed file: " + originalName + " to " + newName);
+            } else {
+                logger.severe("Error renaming file: " + originalName + " to " + newName);
+            }
+        } catch (Exception e) {
+            logger.severe("Error renaming file: " + originalName + ". " + e.getMessage());
+        }
+    }
+
+
+    //Added to determine the highest sequence number for a specific file type in the current folder
+    private static int getCurrentMaxSequence(File folder, String fileType) {
+        // Scan existing files in the folder to determine the current maximum sequence number
+        int max = 0;
+        File[] files = folder.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.getName().startsWith("Renamed_" + fileType)) {
+                    String name = file.getName();
+                    String[] parts = name.split("_");
+                    if (parts.length > 2) {
+                        try {
+                            int num = Integer.parseInt(parts[1].substring(fileType.length()));
+                            max = Math.max(max, num);
+                        } catch (NumberFormatException ignored) {
+                            // Skip invalid naming patterns
+                        }
+                    }
+                }
+            }
+        }
+        return max;
+    }
+
+    private static String getFileType(String extension) {
+        switch (extension) {
+            case ".docx":
+                return "word";
+            case ".xlsx":
+                return "excel";
+            case ".txt":
+                return "text";
+            case ".png":
+                return "image";
+            default:
+                return "file";
+        }
+    }
+}*/
