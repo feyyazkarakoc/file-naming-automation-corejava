@@ -1,146 +1,159 @@
 import java.io.File;
+import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Objects;
 
 public class FileNamingAutomation {
 
+    private static final String pathName = "C:\\Users\\Lenovo\\Desktop\\feyyaz"; // Target directory path
+    private static final String renameSuffix = "renamed"; // Suffix for renaming files
 
-
-    // Target directory path
-    private static final String folderPath = "C:\\Users\\Lenovo\\Desktop\\feyyaz";
-
-    // Türlere göre maksimum numaraları saklamak için bir Map
+    // Map to store counters for each file type
     private static final Map<String, Integer> typeCounters = new HashMap<>();
 
-    // Dosya türleri için uzantılar ve tür isimleri
-    private static final Map<String, String> FILE_TYPES = Map.of(
-            ".docx", "word",
-            ".xlsx", "excel",
-            ".txt", "text",
-            ".png", "image"
-    );
-
     public static void main(String[] args) {
+        File directory = new File(pathName);
 
-        File folder = new File(folderPath);
-
-        if (!folder.exists() || !folder.isDirectory()) {
-            System.out.println("Invalid folder path. Please check and try again.");
+        // Check if the directory exists and is a valid directory
+        if (!directory.exists() || !directory.isDirectory()) {
+            System.out.println("Invalid directory path. Please check and try again.");
             return;
         }
 
-        System.out.println("\nProcessing folder path: " + folder.getAbsolutePath());
+        // First, find the existing counters from renamed files
+        findExistingCounters(directory);
 
-        // Rename the new files in the main folder
-        renameNewFiles(folder);
-
-        // Process subdirectories as well
-        processSubFolders(folder);
-
+        // Then, rename the new files
+        renameNewFiles(directory);
     }
 
-
-    private static void renameNewFiles(File folder) {
-
-        boolean renamedAnyFile = false;
-
-
-        for (File file : Objects.requireNonNull(folder.listFiles())) {
-            if (file.isFile() && !file.getName().startsWith("renamed_")) {
-
-                String extension = getFileExtension(file.getName());
-                String type = FILE_TYPES.getOrDefault(extension, "file");
-
-
-                int currentNumber = typeCounters.getOrDefault(type, findMaxCounter(folder, type)) + 1;
-                typeCounters.put(type, currentNumber);
-
-                // Yeni dosya ismini olustur
-                String newFileName = String.format(
-                        "renamed_%s%d_%s%s",
-                        type,
-                        currentNumber,
-                        getOriginalFileNameWithoutExtension(file.getName()),
-                        extension
-                );
-
-                File renamedFile = new File(folder, newFileName);
-
-
-                // Dosyayı yeniden adlandır
-                if (file.renameTo(renamedFile)) {
-                    System.out.println(file.getName() + " yeniden adlandırıldı -> " + renamedFile.getName());
-
-                    renamedAnyFile = true;
-
-                } else {
-                    System.out.println("Hata: " + file.getName() + " yeniden adlandırılamadı!");
-                }
-            }
-        }
-
-        if (!renamedAnyFile) {
-            System.out.println("No files to rename.");
-        }
-    }
-
-
-    // Dosya uzantısını alır
-    private static String getFileExtension(String fileName) {
-        int index = fileName.lastIndexOf(".");
-        return (index == -1) ? "" : fileName.substring(index);
-    }
-
-    // Dosya adını uzantısı olmadan alır
-    private static String getOriginalFileNameWithoutExtension(String fileName) {
-        int index = fileName.lastIndexOf(".");
-        return (index == -1) ? fileName : fileName.substring(0, index);
-    }
-
-    // Bir tür için klasördeki maksimum numarayı bulur
-    private static int findMaxCounter(File folder, String type) {
-        int maxCounter = 0;
-
-        File[] files = folder.listFiles();
-        if (files == null) {
-            System.out.println("Folder is null.");
-            return maxCounter;
-        }
-
-        for (File file : folder.listFiles()) {
-            if (file.getName().startsWith("renamed_" + type)) {
-                String numberPart = file.getName().substring(("renamed_" + type).length());
-                numberPart = numberPart.split("_")[0]; // İlk "_" karakterine kadar olan kısmı al
-                try {
-                    int number = Integer.parseInt(numberPart);
-                    maxCounter = Math.max(maxCounter, number);
-                } catch (NumberFormatException e) {
-                    System.out.println("Invalid number format: " + e.getMessage()+" "+file.getName());
-                }
-            }
-        }
-
-        return maxCounter;
-    }
-
-
-    private static void processSubFolders(File folder) {
-
-        File[] files = folder.listFiles();
+    /**
+     * Finds the existing counters for renamed files in the directory.
+     * It checks files that contain the 'rename' suffix and extracts the number part from the name.
+     * It updates the typeCounters map to store the maximum number for each file type.
+     */
+    private static void findExistingCounters(File directory) {
+        File[] files = directory.listFiles();
         if (files == null) return;
 
         for (File file : files) {
-            if (file.isDirectory()) {
-                typeCounters.clear();
 
-                System.out.println("\nProcessing subfolder path : " + file.getAbsolutePath());
-                renameNewFiles(file);
+            String fileName = file.getName();
+            if (file.isFile() && fileName.contains(renameSuffix)) {
+                String extension = getFileExtension(fileName);
 
-                processSubFolders(file);
+
+                // Try extracting the number from the file name
+                try {
+                    String numberPart = fileName.substring(getFileTypePrefix(extension).length(), fileName.indexOf(renameSuffix)
+                    );
+                    int number = Integer.parseInt(numberPart);
+
+                    // Update the maximum number found for the file type
+                    //typeCounters.merge(extension, number, Integer::max);
+                    if (typeCounters.containsKey(extension)) {
+                        int existingValue = typeCounters.get(extension);
+                        typeCounters.put(extension, Math.max(existingValue, number));
+                    } else {
+                        typeCounters.put(extension, number);
+                    }
+
+                } catch (Exception e) {
+                    // If we can't extract a number, just skip this file
+                }
+            }
+        }
+    }
+
+    /**
+     * Renames the new files in the directory that don't already have the 'rename' suffix.
+     * It sorts the files alphabetically and renames them sequentially.
+     */
+    private static void renameNewFiles(File directory) {
+        File[] files = directory.listFiles();
+        if (files == null) return;
+
+        // Sort the files by name to ensure sequential renaming
+        Arrays.sort(files, Comparator.comparing(File::getName));
+
+        boolean renamedAnyFile = false;
+
+        // Process each file that doesn't have the 'rename' suffix
+        for (File file : files) {
+            if (file.isFile() && !file.getName().contains(renameSuffix)) {
+                renameFile(file);
+                renamedAnyFile=true;
             }
         }
 
+        if (!renamedAnyFile){
+            System.out.println("No new files were renamed. All files are already renamed.");
+        }
     }
 
+    /**
+     * Renames a file by adding a sequential number based on its type.
+     * The new file name consists of the file type prefix, a sequential number, the 'rename' suffix, and the file extension.
+     *
+     * @param file The file to be renamed.
+     */
+    private static void renameFile(File file) {
+        String extension = getFileExtension(file.getName());
+        String fileType = getFileTypePrefix(extension);
+
+        // Get the current counter for the file type and increment it
+        int typeCount = typeCounters.getOrDefault(extension, 0) + 1;
+        typeCounters.put(extension, typeCount);
+
+        // Create the new file name
+        String newFileName = String.format("%s%d%s%s",
+                fileType,
+                typeCount,
+                renameSuffix,
+                extension
+        );
+
+        File renamedFile = new File(file.getParent(), newFileName);
+
+        // Attempt to rename the file and output the result
+        if (file.renameTo(renamedFile)) {
+            System.out.println("Renamed: " + file.getName() + " -> " + newFileName);
+        } else {
+            System.out.println("Renaming failed: " + file.getName());
+        }
+    }
+
+    /**
+     * Gets the file type prefix based on the file extension.
+     * For example, ".docx" and ".doc" return "word", ".pdf" returns "pdf", etc.
+     *
+     * @param extension The file extension (e.g., ".docx", ".pdf").
+     * @return The file type prefix (e.g., "word", "pdf").
+     */
+    private static String getFileTypePrefix(String extension) {
+        switch (extension.toLowerCase()) {
+            case ".docx":
+                return "word";
+            case ".xlsx":
+                return "excel";
+            case ".txt":
+                return "txt";
+            case ".png":
+                return "image";
+            default:
+                return "file";
+        }
+    }
+
+    /**
+     * Extracts the file extension from a file name.
+     *
+     * @param fileName The file name (e.g., "document.docx").
+     * @return The file extension (e.g., ".docx").
+     */
+    private static String getFileExtension(String fileName) {
+        int dotIndex = fileName.lastIndexOf('.');
+        return (dotIndex != -1) ? fileName.substring(dotIndex) : "";
+    }
 }
